@@ -34,10 +34,10 @@ aes_encrypt_cbc(plaintext, ciphertext, sizeof(ciphertext), &aes_key, iv);
 ```
 
 #### Invaluable Resources
-https://en.wikipedia.org/wiki/Advanced_Encryption_Standard
-https://en.wikipedia.org/wiki/Rijndael_key_schedule
-https://github.com/B-Con
-https://github.com/kokke/tiny-AES-c
+- https://en.wikipedia.org/wiki/Advanced_Encryption_Standard
+- https://en.wikipedia.org/wiki/Rijndael_key_schedule
+- https://github.com/B-Con
+- https://github.com/kokke/tiny-AES-c
 
 ## Author
 
