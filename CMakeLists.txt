@@ -3,7 +3,8 @@ project(libcrypto C)
 
 set(CMAKE_C_STANDARD 11)
 
-add_library(libcrypto SHARED aes.c aes.h msws_prng.c msws_prng.h)
+include_directories(include)
 
-add_executable(test_aes test_aes.c)
-target_link_libraries(test_aes libcrypto)
+add_subdirectory(lib)
+add_subdirectory(src)
+

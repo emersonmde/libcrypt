@@ -1,10 +1,28 @@
-#include "aes.h"
+/*
+ * An implementation of the Advanced Encryption Standard algorithm
+ *
+ * This is not meant to be cryptographically secure! It is for learning purposes only.
+ *
+ * This implementation only supports 128 bit keys, though in the future I plan on adding support
+ * for 192 and 256 bit keys as well. In order to use this library, they key has to be expanded
+ * and packed into an AES_KEY struct. This is then passed to encrypt/decrypt along with the input
+ * message that needs to be exactly 128 bits. There is also support for AES CBC as long as the
+ * input is a multiple of 128 (padding is not automatically added).
+ *
+ * Some resources that were invaluable were:
+ * https://en.wikipedia.org/wiki/Advanced_Encryption_Standard
+ * https://en.wikipedia.org/wiki/Rijndael_key_schedule
+ * https://github.com/B-Con
+ * https://github.com/kokke/tiny-AES-c
+ */
 
 #include <memory.h>
 #include <time.h>
 #include <stdlib.h>
 #include <fcntl.h>
 #include <unistd.h>
+
+#include "aes.h"
 
 // Row shift lookup tables
 static const uint8_t shift_rows_table[] = {0, 5, 10, 15, 4, 9, 14, 3, 8, 13, 2, 7, 12, 1, 6, 11};
@@ -170,11 +188,13 @@ static const uint8_t g14[] = {
         0xd7, 0xd9, 0xcb, 0xc5, 0xef, 0xe1, 0xf3, 0xfd, 0xa7, 0xa9, 0xbb, 0xb5, 0x9f, 0x91, 0x83, 0x8d
 };
 
+// XORs each byte in a buffer
 static void memxor(uint8_t *a, const uint8_t *b, ssize_t n) {
     for (int i = 0; i < n; i++)
         a[i] ^= b[i];
 }
 
+// Used to rotate rows with carry
 static void rotate(uint8_t *in) {
     uint8_t t = in[0];
     for (int i = 0; i < 3; i++)
@@ -182,6 +202,7 @@ static void rotate(uint8_t *in) {
     in[3] = t;
 }
 
+// XORs the current round key with the state
 static void add_round_key(uint8_t *state, const uint8_t *round_keys, int round) {
     memxor(state, round_keys + round * AES_BLOCK_SIZE, AES_BLOCK_SIZE);
 }
@@ -282,6 +303,7 @@ void aes_expand_key(uint8_t *round_keys, const uint8_t *key) {
 }
 
 // Initialize context
+// TODO: Add support for 192/256 bit keys
 void aes_set_key(const uint8_t *key_in, AES_KEY *key_out, size_t len) {
     if (len == 16) {
         // 128 bit key
@@ -296,6 +318,13 @@ void aes_set_key(const uint8_t *key_in, AES_KEY *key_out, size_t len) {
     }
 }
 
+/*
+ * Encrypts the plaintext "in", outputting the ciphertext to the "out" buffer.
+ * This requires AES_KEY to be previously expanded using aes_set_key(). Both
+ * in and out need to be exactly 16 bytes.
+ *
+ * TODO: Update middle rounds to handle 192/256 bit keys
+ */
 void aes_encrypt(const uint8_t *in, uint8_t *out, const AES_KEY *key) {
     memcpy(out, in, AES_BLOCK_SIZE);
     // First Round
@@ -323,6 +352,13 @@ void aes_encrypt(const uint8_t *in, uint8_t *out, const AES_KEY *key) {
     add_round_key(out, key->round_keys, 10);
 }
 
+/*
+ * Decrypts the ciphertext in the "in" buffer outputing the plaintext to
+ * the "out" buffer. Requires AES_KEY to include the expanded round keys
+ * setup using aes_set_key(). Both in and out need to be exactly 16 bytes.
+ *
+ * TODO: Update middle rounds to handle 192/256 bit keys
+ */
 void aes_decrypt(const uint8_t *in, uint8_t *out, const AES_KEY *key) {
     memcpy(out, in, AES_BLOCK_SIZE);
     // First Round
@@ -342,8 +378,14 @@ void aes_decrypt(const uint8_t *in, uint8_t *out, const AES_KEY *key) {
     add_round_key(out, key->round_keys, 0);
 }
 
+/*
+ * Loops over plaintext in the "in" buffer taking AES_BLOCK_SIZE blocks (currently 16 bytes) encrypting
+ * each block with the previous ciphertext. For the first block, the xor is preformed using "iv". Both
+ * in and out need to be the same length which needs to be a multiple of AES_BLOCK_SIZE (16 bytes).
+ * AES_KEY must be setup using aes_set_key() before encrypting.
+ */
 void aes_encrypt_cbc(const uint8_t *in, uint8_t *out, size_t len, const AES_KEY *key, const uint8_t *iv) {
-    uint8_t *iv_buf = iv;
+    const uint8_t *iv_buf = iv;
     memcpy(out, in, len);
     for (int i = 0; i < len; i += AES_BLOCK_SIZE) {
         memxor(out + i, iv_buf, AES_BLOCK_SIZE);
@@ -352,12 +394,16 @@ void aes_encrypt_cbc(const uint8_t *in, uint8_t *out, size_t len, const AES_KEY 
     }
 }
 
+/*
+ * Reverses aes_encrypt_cbc(). Requires "in" and "out" to be the same size and a multiple of
+ * AES_BLOCK_SIZE (16 bytes). AES_KEY needs to be setup using aes_set_key() before decryption.
+ * Also iv needs to be the same iv used during encryption.
+ */
 void aes_cbc_decrypt(const uint8_t *in, uint8_t *out, const size_t len, const AES_KEY *key, const uint8_t *iv) {
-    uint8_t iv_buf[AES_BLOCK_SIZE];
-    memcpy(iv_buf, iv, AES_BLOCK_SIZE);
+    const uint8_t *iv_buf = iv;
     for (int i = 0; i < len; i += AES_BLOCK_SIZE) {
         aes_decrypt(in + i, out + i, key);
         memxor(out + i, iv_buf, AES_BLOCK_SIZE);
-        memcpy(iv_buf, in + i, AES_BLOCK_SIZE);
+        iv_buf = in + i;
     }
 }
