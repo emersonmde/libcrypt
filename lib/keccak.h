@@ -26,15 +26,19 @@ typedef struct {
     // Number of rounds
     int nr;
     // Word length - b/25
-    size_t w;
+    uint8_t w;
     // ?? - log2(b/25)
-    size_t l;
+    uint8_t l;
+    // State
+    uint64_t **a;
 } KECCAK_CTX;
 
-void theta(const uint64_t **a, uint64_t **b, KECCAK_CTX *ctx);
-void rho(const uint64_t **a, uint64_t **b, KECCAK_CTX *ctx);
-void pi(const uint64_t **a, uint64_t **b, KECCAK_CTX *ctx);
-void chi(const uint64_t **a, uint64_t **b, KECCAK_CTX *ctx);
-void iota(const uint64_t **a, uint64_t **b, int nr, KECCAK_CTX *ctx);
+void theta(uint64_t a[5][5], uint64_t b[5][5], KECCAK_CTX *ctx);
+void rho(uint64_t a[5][5], uint64_t b[5][5], KECCAK_CTX *ctx);
+void pi(uint64_t a[5][5], uint64_t b[5][5], KECCAK_CTX *ctx);
+void chi(uint64_t a[5][5], uint64_t b[5][5], KECCAK_CTX *ctx);
+void iota(uint64_t a[5][5], uint64_t b[5][5], uint8_t ir, KECCAK_CTX *ctx);
+
+void keccakf(const uint64_t *in, uint64_t *out);
 
 #endif //LIBCRYPTO_KECCAK_H
